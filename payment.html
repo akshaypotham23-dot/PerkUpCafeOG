@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Payment — PerkUpCafé</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☕</text></svg>">
+  <link rel="stylesheet" href="{{ url_for('static', filename='CSS/Style.css') }}">
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <style>
+    body { background:#f5ede0; }
+    .pay-wrapper { max-width:900px; margin:36px auto; padding:0 20px 60px; font-family:Georgia,serif; }
+
+    /* Header */
+    .pay-header { text-align:center; margin-bottom:32px; }
+    .pay-header h2 { font-size:1.9rem; color:#3b1a08; margin-bottom:6px; font-weight:700; }
+    .pay-header p { color:#b09880; font-size:0.9rem; }
+    .pay-header .step-bar {
+      display:flex; justify-content:center; align-items:center;
+      gap:0; margin:20px auto 0; max-width:400px;
+    }
+    .step { display:flex; flex-direction:column; align-items:center; gap:4px; flex:1; }
+    .step-circle {
+      width:32px; height:32px; border-radius:50%;
+      background:#e0c9a6; color:#fff; font-size:0.85rem;
+      font-weight:700; display:flex; align-items:center; justify-content:center;
+    }
+    .step.done .step-circle { background:#27ae60; }
+    .step.active .step-circle { background:#a65c1c; }
+    .step-label { font-size:0.7rem; color:#b09880; text-transform:uppercase; letter-spacing:0.5px; }
+    .step.active .step-label { color:#a65c1c; font-weight:700; }
+    .step-line { flex:1; height:2px; background:#e0c9a6; margin-bottom:16px; }
+    .step-line.done { background:#27ae60; }
+
+    /* Grid */
+    .pay-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+    @media(max-width:640px) { .pay-grid { grid-template-columns:1fr; } }
+
+    /* Cards */
+    .pay-card {
+      background:#fff; border:1.5px solid #e0c9a6;
+      border-radius:18px; padding:26px;
+      box-shadow: 0 4px 20px rgba(59,26,8,0.06);
+    }
+    .pay-card-title {
+      font-size:1rem; font-weight:700; color:#3b1a08;
+      margin-bottom:18px; padding-bottom:12px;
+      border-bottom:1.5px solid #f0e4d0;
+      display:flex; align-items:center; gap:8px;
+    }
+
+    /* Order summary */
+    .pay-item-row {
+      display:flex; justify-content:space-between; align-items:center;
+      padding:9px 0; border-bottom:1px solid #f8f0e6;
+      font-size:0.88rem; color:#4a2f18;
+    }
+    .pay-item-left { display:flex; align-items:center; gap:8px; }
+    .pay-item-name { font-weight:600; }
+    .pay-item-qty {
+      background:#fdf0e0; color:#a65c1c; border-radius:20px;
+      padding:2px 8px; font-size:0.75rem; font-weight:700;
+    }
+    .pay-item-price { font-weight:700; color:#a65c1c; }
+    .pay-summary-row {
+      display:flex; justify-content:space-between;
+      padding:8px 0; font-size:0.85rem; color:#b09880;
+    }
+    .pay-summary-row.free span:last-child { color:#27ae60; font-weight:700; }
+    .pay-total-row {
+      display:flex; justify-content:space-between;
+      padding:14px 0 0; border-top:2px solid #e0c9a6;
+      font-size:1.1rem; font-weight:700; color:#3b1a08; margin-top:8px;
+    }
+    .pay-total-row span:last-child { color:#a65c1c; font-size:1.3rem; }
+
+    /* Payment method tabs */
+    .pay-method-tabs { display:flex; gap:10px; margin-bottom:20px; }
+    .pay-tab {
+      flex:1; padding:12px 8px; border:2px solid #e0c9a6;
+      border-radius:12px; background:#fdf6ec; color:#6b4c30;
+      font-family:Georgia,serif; font-size:0.82rem;
+      cursor:pointer; text-align:center; transition:all 0.2s;
+    }
+    .pay-tab:hover { border-color:#c8a96e; }
+    .pay-tab.active {
+      border-color:#a65c1c; background:#fff8f0;
+      color:#a65c1c; font-weight:700;
+      box-shadow: 0 2px 10px rgba(166,92,28,0.15);
+    }
+    .pay-tab .tab-icon { font-size:1.3rem; display:block; margin-bottom:3px; }
+    .pay-tab .tab-label { font-size:0.75rem; }
+
+    /* Info boxes */
+    .pay-info-box {
+      border-radius:12px; padding:16px;
+      font-size:0.86rem; line-height:1.8; margin-bottom:16px;
+    }
+    .pay-info-box.blue { background:#f0f7ff; border:1.5px solid #cce0ff; color:#1a4a8a; }
+    .pay-info-box.cream { background:#fdf6ec; border:1.5px solid #e0c9a6; color:#6b4c30; }
+    .pay-info-box strong { display:block; margin-bottom:4px; font-size:0.92rem; }
+    .pay-info-box ul { margin:6px 0 0 0; padding-left:18px; }
+    .pay-info-box ul li { margin-bottom:2px; }
+
+    /* Pay button */
+    .pay-btn {
+      width:100%; padding:16px;
+      background: linear-gradient(135deg, #a65c1c, #3b1a08);
+      color:#fff; border:none; border-radius:14px;
+      font-family:Georgia,serif; font-size:1.05rem; font-weight:700;
+      cursor:pointer; margin-top:6px; transition:all 0.2s;
+      letter-spacing:0.5px; box-shadow: 0 4px 14px rgba(166,92,28,0.3);
+    }
+    .pay-btn:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(166,92,28,0.4); }
+    .pay-btn:disabled { background:#c8a96e; cursor:not-allowed; transform:none; box-shadow:none; }
+
+    .secure-badge {
+      display:flex; align-items:center; justify-content:center;
+      gap:6px; font-size:0.72rem; color:#b09880; margin-top:12px;
+    }
+    .secure-badge span { color:#27ae60; }
+
+    /* Bill overlay */
+    .bill-overlay {
+      display:none; position:fixed; inset:0;
+      background:rgba(0,0,0,0.6); z-index:1000;
+      align-items:center; justify-content:center;
+      backdrop-filter:blur(4px);
+    }
+    .bill-overlay.show { display:flex; }
+    .bill-box {
+      background:#fff; border-radius:24px; padding:0;
+      max-width:440px; width:92%;
+      box-shadow:0 24px 80px rgba(0,0,0,0.3);
+      font-family:Georgia,serif; overflow:hidden;
+      animation: popIn 0.3s cubic-bezier(0.34,1.4,0.64,1);
+    }
+    @keyframes popIn { from { transform:scale(0.85); opacity:0; } to { transform:scale(1); opacity:1; } }
+
+    .bill-top {
+      background: linear-gradient(135deg, #3b1a08, #a65c1c);
+      padding:32px 32px 28px;
+      text-align:center; color:#fff;
+    }
+    .bill-check { font-size:3rem; margin-bottom:10px; }
+    .bill-title { font-size:1.6rem; font-weight:700; margin-bottom:4px; }
+    .bill-sub   { font-size:0.85rem; opacity:0.8; }
+
+    .bill-body { padding:24px 28px; }
+    .bill-cafe-name {
+      text-align:center; font-size:1rem; font-weight:700;
+      color:#3b1a08; margin-bottom:4px;
+    }
+    .bill-order-info {
+      text-align:center; font-size:0.78rem; color:#b09880;
+      margin-bottom:18px; padding-bottom:14px;
+      border-bottom:1.5px dashed #e0c9a6;
+    }
+    .bill-item-row {
+      display:flex; justify-content:space-between;
+      font-size:0.86rem; color:#4a2f18; padding:5px 0;
+    }
+    .bill-divider { border:none; border-top:1.5px dashed #e0c9a6; margin:10px 0; }
+    .bill-total-row {
+      display:flex; justify-content:space-between;
+      font-size:1rem; font-weight:700; color:#3b1a08;
+      padding:6px 0;
+    }
+    .bill-total-row span:last-child { color:#a65c1c; font-size:1.1rem; }
+    .bill-paid-via {
+      text-align:center; font-size:0.78rem; color:#b09880;
+      margin-top:14px; padding-top:12px;
+      border-top:1.5px dashed #e0c9a6;
+    }
+    .bill-paid-via .method-badge {
+      display:inline-block; background:#fdf0e0; color:#a65c1c;
+      border-radius:20px; padding:3px 12px; font-weight:700;
+      font-size:0.8rem; margin-top:4px;
+    }
+    .bill-actions {
+      display:flex; gap:12px;
+      padding:0 28px 24px;
+    }
+    .bill-btn {
+      flex:1; padding:13px; border-radius:12px;
+      font-family:Georgia,serif; font-size:0.9rem;
+      font-weight:700; cursor:pointer; border:none;
+      transition:all 0.15s;
+    }
+    .bill-btn-outline {
+      background:#fdf6ec; color:#3b1a08;
+      border:1.5px solid #e0c9a6;
+    }
+    .bill-btn-outline:hover { background:#f5e8d0; }
+    .bill-btn-primary { background:#a65c1c; color:#fff; }
+    .bill-btn-primary:hover { background:#3b1a08; }
+  </style>
+</head>
+<body class="dashboard" style="visibility:hidden;">
+
+  <header>
+    <h1><em><u>PerkUpCafé</u></em></h1>
+    <h4><mark>THE COFFEE SHOP</mark></h4>
+  </header>
+
+  <div class="pay-wrapper">
+    <div class="pay-header">
+      <h2>🔒 Secure Checkout</h2>
+      <p>Complete your payment to place your order</p>
+      <div class="step-bar">
+        <div class="step done">
+          <div class="step-circle">✓</div>
+          <div class="step-label">Cart</div>
+        </div>
+        <div class="step-line done"></div>
+        <div class="step active">
+          <div class="step-circle">2</div>
+          <div class="step-label">Payment</div>
+        </div>
+        <div class="step-line"></div>
+        <div class="step">
+          <div class="step-circle">3</div>
+          <div class="step-label">Confirm</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pay-grid">
+
+      <!-- LEFT: Order Summary -->
+      <div class="pay-card">
+        <div class="pay-card-title">🛒 Order Summary</div>
+        <div id="summaryItems">Loading…</div>
+        <div style="margin-top:12px;">
+          <div class="pay-summary-row"><span>Subtotal</span><span id="subtotalVal">—</span></div>
+          <div class="pay-summary-row free"><span>Delivery</span><span>Free 🎉</span></div>
+          <div class="pay-summary-row"><span>Taxes (5%)</span><span id="taxVal">—</span></div>
+          <div class="pay-total-row"><span>Total</span><span id="totalVal">—</span></div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Payment -->
+      <div class="pay-card">
+        <div class="pay-card-title">💳 Payment Method</div>
+
+        <div class="pay-method-tabs">
+          <div class="pay-tab active" onclick="selectMethod('card', this)">
+            <span class="tab-icon">💳</span>
+            <span class="tab-label">Card</span>
+          </div>
+          <div class="pay-tab" onclick="selectMethod('upi', this)">
+            <span class="tab-icon">📱</span>
+            <span class="tab-label">UPI</span>
+          </div>
+          <div class="pay-tab" onclick="selectMethod('cod', this)">
+            <span class="tab-icon">💵</span>
+            <span class="tab-label">Cash</span>
+          </div>
+        </div>
+
+        <!-- Card -->
+        <div id="cardSection">
+          <div class="pay-info-box blue">
+            <strong>💳 Pay by Card via Razorpay</strong>
+            Click Pay below — a secure Razorpay popup will open.
+            <ul>
+              <li>Visa, Mastercard, RuPay, Amex accepted</li>
+              <li>3D Secure verified</li>
+              <li>No card details stored on our server</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- UPI -->
+        <div id="upiSection" style="display:none;">
+          <div class="pay-info-box blue">
+            <strong>📱 Pay by UPI via Razorpay</strong>
+            Click Pay below — enter your UPI ID in the popup.
+            <ul>
+              <li>Works with GPay, PhonePe, Paytm, BHIM</li>
+              <li>Instant payment confirmation</li>
+              <li>100% secure & encrypted</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- COD -->
+        <div id="codSection" style="display:none;">
+          <div class="pay-info-box cream">
+            <strong>💵 Cash on Delivery</strong>
+            Pay in cash when your order arrives at your door.
+            <ul>
+              <li>No online payment required</li>
+              <li>Please keep exact change ready</li>
+              <li>No extra charges for COD</li>
+            </ul>
+          </div>
+        </div>
+
+        <div id="payError" style="color:#c0392b; font-size:0.83rem; margin-bottom:8px; display:none;"></div>
+
+        <button class="pay-btn" id="payBtn" onclick="processPayment()">
+          Pay ₹<span id="payBtnAmount">—</span>
+        </button>
+
+        <div class="secure-badge">
+          <span>🔒</span> 256-bit SSL Encrypted &nbsp;·&nbsp;
+          <span>✓</span> Safe & Secure &nbsp;·&nbsp; Powered by Razorpay
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bill Overlay -->
+  <div class="bill-overlay" id="billOverlay">
+    <div class="bill-box">
+      <div class="bill-top">
+        <div class="bill-check">✅</div>
+        <div class="bill-title">Order Placed!</div>
+        <div class="bill-sub">Your order has been confirmed successfully</div>
+      </div>
+      <div class="bill-body">
+        <div class="bill-cafe-name">☕ PerkUpCafé</div>
+        <div class="bill-order-info">
+          <span id="billOrderNo">Order #—</span> &nbsp;·&nbsp; <span id="billDate"></span>
+        </div>
+        <div id="billItems"></div>
+        <hr class="bill-divider">
+        <div class="bill-item-row" style="color:#b09880;"><span>Delivery</span><span style="color:#27ae60;">Free</span></div>
+        <div class="bill-item-row" style="color:#b09880;"><span>Tax (5%)</span><span id="billTax">—</span></div>
+        <hr class="bill-divider">
+        <div class="bill-total-row"><span>Total Paid</span><span id="billTotal">—</span></div>
+        <div class="bill-paid-via">
+          Payment Method<br>
+          <span class="method-badge" id="billMeta">—</span>
+        </div>
+      </div>
+      <div class="bill-actions">
+        <button class="bill-btn bill-btn-outline" onclick="window.print()">🖨 Print</button>
+        <button class="bill-btn bill-btn-primary" onclick="goToOrders()">My Orders →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let cartData   = {};
+    let subtotal   = 0, tax = 0, grandTotal = 0;
+    let payMethod  = "card";
+    let userName   = "", userEmail = "";
+
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg; t.classList.add("show");
+      setTimeout(() => t.classList.remove("show"), 2500);
+    }
+
+    fetch("/check-session", { credentials:"include" })
+    .then(r => r.json())
+    .then(d => {
+      if (!d.loggedIn) { window.location.href = "/"; return; }
+      userName = d.name || ""; userEmail = d.email || "";
+    }).catch(() => window.location.href = "/");
+
+    fetch("/get-cart", { credentials:"include" })
+    .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+    .then(data => {
+      cartData = data.cart || {};
+      if (Object.keys(cartData).length === 0) { window.location.href = "/"; return; }
+
+      subtotal   = Object.values(cartData).reduce((s, i) => s + i.qty * i.price, 0);
+      tax        = Math.round(subtotal * 0.05);
+      grandTotal = subtotal + tax;
+
+      document.getElementById("summaryItems").innerHTML =
+        Object.values(cartData).map(i => `
+          <div class="pay-item-row">
+            <div class="pay-item-left">
+              <span class="pay-item-name">${i.name}</span>
+              <span class="pay-item-qty">×${i.qty}</span>
+            </div>
+            <span class="pay-item-price">₹${i.qty * i.price}</span>
+          </div>`).join("");
+
+      document.getElementById("subtotalVal").textContent  = `₹${subtotal}`;
+      document.getElementById("taxVal").textContent       = `₹${tax}`;
+      document.getElementById("totalVal").textContent     = `₹${grandTotal}`;
+      document.getElementById("payBtnAmount").textContent = grandTotal;
+      document.body.style.visibility = "visible";
+    })
+    .catch(() => window.location.href = "/");
+
+    function selectMethod(method, btn) {
+      payMethod = method;
+      document.querySelectorAll(".pay-tab").forEach(t => t.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById("cardSection").style.display = method === "card" ? "block" : "none";
+      document.getElementById("upiSection").style.display  = method === "upi"  ? "block" : "none";
+      document.getElementById("codSection").style.display  = method === "cod"  ? "block" : "none";
+      const labels = { card: `Pay ₹${grandTotal}`, upi: `Pay ₹${grandTotal}`, cod: `Place Order — ₹${grandTotal}` };
+      document.getElementById("payBtn").innerHTML = labels[method];
+    }
+
+    function processPayment() {
+      const btn = document.getElementById("payBtn");
+      btn.disabled = true;
+
+      if (payMethod === "cod") {
+        btn.textContent = "Placing order…";
+        fetch("/checkout", { method:"POST", credentials:"include" })
+        .then(r => r.json())
+        .then(data => {
+          if (data.order_id) { showBill(data.order_id, "Cash on Delivery"); }
+          else { btn.disabled=false; btn.innerHTML=`Place Order — ₹${grandTotal}`; showToast("Order failed. Try again."); }
+        })
+        .catch(() => { btn.disabled=false; btn.innerHTML=`Place Order — ₹${grandTotal}`; showToast("Something went wrong."); });
+        return;
+      }
+
+      btn.textContent = "Opening payment…";
+      fetch("/create-razorpay-order", { method:"POST", credentials:"include" })
+      .then(r => r.json())
+      .then(data => {
+        if (!data.razorpay_order_id) throw new Error(data.message || "Failed");
+
+        const rzp = new Razorpay({
+          key:         data.key,
+          amount:      data.amount,
+          currency:    data.currency,
+          name:        "PerkUpCafé",
+          description: "Coffee & Snacks Order",
+          order_id:    data.razorpay_order_id,
+          prefill:     { name: userName, email: userEmail },
+          theme:       { color: "#a65c1c" },
+          handler: function(response) {
+            fetch("/verify-payment", {
+              method:"POST", headers:{"Content-Type":"application/json"},
+              credentials:"include",
+              body: JSON.stringify({
+                razorpay_order_id:   response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature:  response.razorpay_signature,
+                payment_method:      payMethod
+              })
+            })
+            .then(r => r.json())
+            .then(v => {
+              if (v.order_id) { showBill(v.order_id, payMethod === "card" ? "Card Payment" : "UPI Payment"); }
+              else { showToast("Payment done but order failed. Contact support."); btn.disabled=false; btn.innerHTML=`Pay ₹${grandTotal}`; }
+            })
+            .catch(() => { showToast("Verification failed."); btn.disabled=false; btn.innerHTML=`Pay ₹${grandTotal}`; });
+          },
+          modal: { ondismiss: function() { btn.disabled=false; btn.innerHTML=`Pay ₹${grandTotal}`; showToast("Payment cancelled."); } }
+        });
+        rzp.on("payment.failed", function(r) {
+          btn.disabled=false; btn.innerHTML=`Pay ₹${grandTotal}`;
+          showToast("Payment failed: " + (r.error.description || "Try again"));
+        });
+        rzp.open();
+      })
+      .catch(err => { btn.disabled=false; btn.innerHTML=`Pay ₹${grandTotal}`; showToast("Error: "+err.message); });
+    }
+
+    function showBill(orderId, methodLabel) {
+      document.getElementById("billOrderNo").textContent = `Order #${orderId}`;
+      document.getElementById("billDate").textContent    = new Date().toLocaleString("en-IN", {dateStyle:"medium", timeStyle:"short"});
+      document.getElementById("billItems").innerHTML     =
+        Object.values(cartData).map(i => `
+          <div class="bill-item-row">
+            <span>${i.name} <span style="color:#b09880;">×${i.qty}</span></span>
+            <span>₹${i.qty * i.price}</span>
+          </div>`).join("");
+      document.getElementById("billTax").textContent   = `₹${tax}`;
+      document.getElementById("billTotal").textContent = `₹${grandTotal}`;
+      document.getElementById("billMeta").textContent  = methodLabel;
+      document.getElementById("billOverlay").classList.add("show");
+    }
+
+    function goToOrders() { window.location.href = "/?section=orders"; }
+  </script>
+</body>
+</html>
